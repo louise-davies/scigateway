@@ -69,6 +69,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' }}
 
+      - name: 'Generate changelog'
+        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: CHANGELOG-BASE.md
+          exclude-tags: 'snapshot,snapshot-develop'
+
       - name: Create/update release
         uses: softprops/action-gh-release@v1
         with:
@@ -78,3 +85,13 @@ jobs:
           tag_name: ${{ env.TAG_NAME }}
           prerelease: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' }}
           draft: false
+          body_path: CHANGELOG.md
+
+      - name: Commit updated CHANGELOG
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          branch: main
+          commit_message: Update CHANGELOG
+          file_pattern: CHANGELOG.md
+        if: ${{ github.ref != 'refs/heads/main' || github.ref != 'refs/heads/develop' }}
+
