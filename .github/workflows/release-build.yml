@@ -74,7 +74,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           base: CHANGELOG-BASE.md
-          exclude-tags: 'snapshot,snapshot-develop'
+          excludeTags: 'snapshot,snapshot-develop'
 
       - name: Create/update release
         uses: softprops/action-gh-release@v1
@@ -93,5 +93,5 @@ jobs:
           branch: main
           commit_message: Update CHANGELOG
           file_pattern: CHANGELOG.md
-        if: ${{ github.ref != 'refs/heads/main' || github.ref != 'refs/heads/develop' }}
+        if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
