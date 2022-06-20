@@ -75,6 +75,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: ./scigateway-${{ env.TAG_NAME }}.tar.gz
           name: ${{ env.TAG_NAME }}
-          tag: ${{ env.TAG_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
           prerelease: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' }}
           draft: false
