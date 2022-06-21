@@ -39,6 +39,7 @@ jobs:
           base: CHANGELOG-BASE.md
           excludeTags: 'snapshot,snapshot-develop'
           futureRelease: v${{ env.VERSION }}
+          sinceTag: v1.0.0
 
       - name: Commit changelog & package.json
         uses: stefanzweifel/git-auto-commit-action@v4
