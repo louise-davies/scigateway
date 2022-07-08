@@ -49,6 +49,8 @@ jobs:
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: ${{ runner.os }}-yarn-
 
+      - run: git checkout HEAD~1 yarn.lock
+
       - run: yarn install --no-immutable --mode=update-lockfile
 
       - run: yarn dedupe
