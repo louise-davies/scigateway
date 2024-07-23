@@ -4,7 +4,8 @@ on:
     branches:
       - main
       - develop
-    tags: '*'
+    tags: 
+      - '*'
 
 jobs:
   build:
@@ -55,15 +56,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' }}
 
-      - name: 'Generate changelog'
-        uses: heinrichreimer/github-changelog-generator-action@v2.3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: CHANGELOG-BASE.md
-          excludeTags: 'snapshot,snapshot-develop'
-
       - name: Create/update release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: ./scigateway-${{ env.TAG_NAME }}.tar.gz
@@ -71,4 +65,4 @@ jobs:
           tag_name: ${{ env.TAG_NAME }}
           prerelease: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' }}
           draft: false
-          body_path: CHANGELOG.md
+          generate_release_notes: true
