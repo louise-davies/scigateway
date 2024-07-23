@@ -5,14 +5,14 @@ import * as React from 'react';
 import { Provider } from 'react-redux';
 import { AnyAction, applyMiddleware, compose, createStore } from 'redux';
 import { createLogger } from 'redux-logger';
-import thunk, { ThunkDispatch } from 'redux-thunk';
+import { thunk, ThunkDispatch } from 'redux-thunk';
 import {
   configureSite,
   loadMaintenanceState,
 } from './state/actions/scigateway.actions';
 import ScigatewayMiddleware, {
-  listenToPlugins,
   autoLoginMiddleware,
+  listenToPlugins,
 } from './state/middleware/scigateway.middleware';
 import AppReducer from './state/reducers/App.reducer';
 import { StateType } from './state/state.types';
@@ -21,6 +21,7 @@ import { ConnectedThemeProvider } from './theming';
 import ReduxToastr from 'react-redux-toastr';
 import PageContainer from './pageContainer.component';
 import { Preloader } from './preloader/preloader.component';
+import { WithTranslation, withTranslation } from 'react-i18next';
 
 const history = createBrowserHistory();
 
@@ -33,8 +34,6 @@ const middleware = [
 if (process.env.NODE_ENV === `development`) {
   const logger = createLogger({ collapsed: true });
   middleware.push(logger);
-  // const {whyDidYouUpdate} = require('why-did-you-update');
-  // whyDidYouUpdate(React);
   log.setDefaultLevel(log.levels.DEBUG);
 } else {
   log.setDefaultLevel(log.levels.ERROR);
@@ -68,24 +67,31 @@ const toastrConfig = (): React.ReactElement => (
   />
 );
 
-class App extends React.Component {
+class App extends React.Component<WithTranslation> {
   public componentDidMount(): void {
     // Check for changes in maintenance state. Ensures that state changes are
-    // loaded when a user does not reload the site for longer than an hour.
-    setInterval(() => {
-      const provider = getState().scigateway.authorisation.provider;
-      if (provider.fetchMaintenanceState) {
-        const storedMaintenanceState = getState().scigateway.maintenance;
-        provider.fetchMaintenanceState().then((fetchedMaintenanceState) => {
-          if (
-            storedMaintenanceState.show !== fetchedMaintenanceState.show ||
-            storedMaintenanceState.message !== fetchedMaintenanceState.message
-          ) {
-            dispatch(loadMaintenanceState(fetchedMaintenanceState));
-          }
-        });
-      }
-    }, 1000 * 60 * 60);
+    // loaded when a user does not reload the site for longer than 5 minutes.
+    setInterval(
+      () => {
+        const provider = getState().scigateway.authorisation.provider;
+        if (provider.fetchMaintenanceState) {
+          const storedMaintenanceState = getState().scigateway.maintenance;
+          provider.fetchMaintenanceState().then((fetchedMaintenanceState) => {
+            if (
+              storedMaintenanceState.show !== fetchedMaintenanceState.show ||
+              storedMaintenanceState.message !== fetchedMaintenanceState.message
+            ) {
+              dispatch(loadMaintenanceState(fetchedMaintenanceState));
+
+              // Reload the page if maintenance state changes from true to false
+              if (storedMaintenanceState.show && !fetchedMaintenanceState.show)
+                window.location.reload();
+            }
+          });
+        }
+      },
+      1000 * 60 * 5
+    );
   }
 
   public render(): React.ReactElement {
@@ -94,12 +100,14 @@ class App extends React.Component {
         <Provider store={store}>
           <ConnectedRouter history={history}>
             <ConnectedThemeProvider>
-              <React.Suspense
-                fallback={<Preloader fullScreen={true} loading={true} />}
-              >
-                {toastrConfig()}
-                <PageContainer />
-              </React.Suspense>
+              {this.props.tReady ? (
+                <>
+                  {toastrConfig()}
+                  <PageContainer />
+                </>
+              ) : (
+                <Preloader fullScreen loading />
+              )}
             </ConnectedThemeProvider>
           </ConnectedRouter>
         </Provider>
@@ -108,4 +116,7 @@ class App extends React.Component {
   }
 }
 
-export default App;
+// export app with no hoc for testing
+export { App as AppSansHoc };
+
+export default withTranslation()(App);

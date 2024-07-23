@@ -1,14 +1,17 @@
 import React from 'react';
+import configureStore, { MockStoreCreator } from 'redux-mock-store';
+import { createLocation, createMemoryHistory, MemoryHistory } from 'history';
+import { Provider } from 'react-redux';
+import * as singleSpa from 'single-spa';
+import { ThemeProvider, useMediaQuery } from '@mui/material';
 import Routing, { PluginPlaceHolder } from './routing.component';
-import { mount, shallow } from 'enzyme';
-import configureStore from 'redux-mock-store';
+import TestAuthProvider from '../authentication/testAuthProvider';
+import NullAuthProvider from '../authentication/nullAuthProvider';
 import { StateType } from '../state/state.types';
 import { authState, initialState } from '../state/reducers/scigateway.reducer';
-import { createLocation } from 'history';
-import { MemoryRouter } from 'react-router-dom';
-import { Provider } from 'react-redux';
-import TestAuthProvider from '../authentication/testAuthProvider';
-import * as singleSpa from 'single-spa';
+import { buildTheme } from '../theming';
+import { render } from '@testing-library/react';
+import { Router } from 'react-router';
 
 jest.mock('../adminPage/adminPage.component', () => () => 'Mocked AdminPage');
 jest.mock(
@@ -18,13 +21,30 @@ jest.mock(
 jest.mock('../preloader/preloader.component', () => ({
   Preloader: () => 'Mocked Preloader',
 }));
-jest.mock('single-spa', () => ({
-  unloadApplication: jest.fn(),
+jest.mock('@mui/material', () => ({
+  __esmodule: true,
+  ...jest.requireActual('@mui/material'),
+  useMediaQuery: jest.fn(),
 }));
 
 describe('Routing component', () => {
-  let mockStore;
+  let mockStore: MockStoreCreator;
+  let history: MemoryHistory;
   let state: StateType;
+
+  function Wrapper({
+    children,
+  }: {
+    children: React.ReactElement;
+  }): JSX.Element {
+    return (
+      <ThemeProvider theme={buildTheme(false)}>
+        <Router history={history}>
+          <Provider store={mockStore(state)}>{children}</Provider>
+        </Router>
+      </ThemeProvider>
+    );
+  }
 
   beforeEach(() => {
     state = {
@@ -35,7 +55,13 @@ describe('Routing component', () => {
       },
     };
 
+    history = createMemoryHistory();
     mockStore = configureStore();
+
+    // I don't think MediaQuery works properly in jest
+    // in the implementation useMediaQuery is used to query whether the current viewport is md or larger
+    // here we assume it is always the case.
+    jest.mocked(useMediaQuery).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -45,11 +71,10 @@ describe('Routing component', () => {
 
   it('renders component with no plugin routes', () => {
     state.scigateway.plugins = [];
-    const wrapper = shallow(<Routing store={mockStore(state)} />)
-      .dive()
-      .dive();
 
-    expect(wrapper).toMatchSnapshot();
+    const { asFragment } = render(<Routing />, { wrapper: Wrapper });
+
+    expect(asFragment()).toMatchSnapshot();
   });
 
   it('renders component with plugins', () => {
@@ -91,12 +116,37 @@ describe('Routing component', () => {
         admin: true,
         order: 5,
       },
+      {
+        section: 'test section',
+        link: 'test link not authorised',
+        plugin: 'test_plugin_name',
+        displayName: 'Test Plugin Not Authorised',
+        unauthorised: true,
+        order: 6,
+      },
     ];
-    const wrapper = shallow(<Routing store={mockStore(state)} />)
-      .dive()
-      .dive();
 
-    expect(wrapper).toMatchSnapshot();
+    const { asFragment } = render(<Routing />, { wrapper: Wrapper });
+
+    expect(asFragment()).toMatchSnapshot();
+  });
+
+  it('renders an unauthorised route for a plugin', () => {
+    state.scigateway.authorisation.provider = new TestAuthProvider(null);
+    state.scigateway.plugins = [
+      {
+        section: 'test section',
+        link: 'test link',
+        plugin: 'test_plugin_name',
+        displayName: 'Test Plugin',
+        unauthorised: true,
+        order: 1,
+      },
+    ];
+
+    const { asFragment } = render(<Routing />, { wrapper: Wrapper });
+
+    expect(asFragment()).toMatchSnapshot();
   });
 
   it('renders a route for a plugin when site is under maintenance and user is admin', () => {
@@ -112,17 +162,12 @@ describe('Routing component', () => {
         order: 1,
       },
     ];
-    const wrapper = mount(
-      <Provider store={mockStore(state)}>
-        <MemoryRouter
-          initialEntries={[{ key: 'testKey', pathname: '/test_link' }]}
-        >
-          <Routing />
-        </MemoryRouter>
-      </Provider>
-    );
 
-    expect(wrapper).toMatchSnapshot();
+    history.replace('/test_link');
+
+    const { asFragment } = render(<Routing />, { wrapper: Wrapper });
+
+    expect(asFragment()).toMatchSnapshot();
   });
 
   it('renders a route for maintenance page when site is under maintenance and user is not admin', () => {
@@ -140,46 +185,35 @@ describe('Routing component', () => {
         order: 1,
       },
     ];
-    const wrapper = mount(
-      <Provider store={mockStore(state)}>
-        <MemoryRouter
-          initialEntries={[{ key: 'testKey', pathname: '/test_link' }]}
-        >
-          <Routing />
-        </MemoryRouter>
-      </Provider>
-    );
+    history.replace('/test_link');
 
-    expect(wrapper).toMatchSnapshot();
+    const { asFragment } = render(<Routing />, { wrapper: Wrapper });
+
+    expect(asFragment()).toMatchSnapshot();
   });
 
   it('renders placeholder for a plugin', () => {
-    const wrapper = shallow(<PluginPlaceHolder id="test_id" />);
-    expect(wrapper).toMatchSnapshot();
+    const { asFragment } = render(<PluginPlaceHolder id="test_id" />);
+    expect(asFragment()).toMatchSnapshot();
   });
 
   it('renders a route for admin page', () => {
     state.scigateway.authorisation.provider = new TestAuthProvider('logged in');
     state.scigateway.siteLoading = false;
-    const wrapper = mount(
-      <Provider store={mockStore(state)}>
-        <MemoryRouter initialEntries={[{ key: 'testKey', pathname: '/admin' }]}>
-          <Routing />
-        </MemoryRouter>
-      </Provider>
-    );
 
-    expect(wrapper).toMatchSnapshot();
+    history.replace('/admin');
+
+    const { asFragment } = render(<Routing />, { wrapper: Wrapper });
+
+    expect(asFragment()).toMatchSnapshot();
   });
 
   it('redirects to a homepage URL if specified', () => {
     state.scigateway.homepageUrl = '/homepage';
 
-    const wrapper = shallow(<Routing store={mockStore(state)} />)
-      .dive()
-      .dive();
+    render(<Routing />, { wrapper: Wrapper });
 
-    expect(wrapper).toMatchSnapshot();
+    expect(history.location.pathname).toEqual('/homepage');
   });
 
   it('redirects to the homepage if navigating to login page while logged in', () => {
@@ -197,11 +231,21 @@ describe('Routing component', () => {
         name === 'autoLogin' ? 'false' : null
       );
 
-    const wrapper = shallow(<Routing store={mockStore(state)} />)
-      .dive()
-      .dive();
+    const { asFragment } = render(<Routing />, { wrapper: Wrapper });
 
-    expect(wrapper).toMatchSnapshot();
+    expect(asFragment()).toMatchSnapshot();
+  });
+
+  it('redirects to / if navigating to login or logout page while using nullAuthProvider', () => {
+    state.scigateway.authorisation.provider = new NullAuthProvider();
+    render(<Routing />, { wrapper: Wrapper });
+    expect(history.location.pathname).toEqual('/');
+
+    history.replace('/login');
+    expect(history.location.pathname).toEqual('/');
+
+    history.replace('/logout');
+    expect(history.location.pathname).toEqual('/');
   });
 
   it('single-spa remounts a plugin when switching between admin and non-admin plugins via single-spa:before-no-app-change event', () => {
@@ -224,13 +268,8 @@ describe('Routing component', () => {
         order: 2,
       },
     ];
-    mount(
-      <Provider store={mockStore(state)}>
-        <MemoryRouter initialEntries={['/test_link']}>
-          <Routing />
-        </MemoryRouter>
-      </Provider>
-    );
+
+    render(<Routing />, { wrapper: Wrapper });
 
     window.dispatchEvent(
       new CustomEvent('single-spa:before-no-app-change', {
@@ -250,6 +289,56 @@ describe('Routing component', () => {
       new CustomEvent('single-spa:before-no-app-change', {
         detail: {
           oldUrl: 'http://localhost/admin_test_link',
+          newUrl: 'http://localhost/test_link',
+        },
+      })
+    );
+    expect(singleSpa.unloadApplication).toHaveBeenCalledWith(
+      'test_plugin_name'
+    );
+  });
+
+  it('single-spa remounts a plugin when switching between authorised and unauthorised plugins via single-spa:before-no-app-change event', () => {
+    state.scigateway.authorisation.provider = new TestAuthProvider('logged in');
+    state.scigateway.siteLoading = false;
+    state.scigateway.plugins = [
+      {
+        section: 'test section',
+        link: '/test_link',
+        plugin: 'test_plugin_name',
+        displayName: 'Test Plugin',
+        order: 1,
+      },
+      {
+        section: 'test section',
+        link: '/unauthorised_test_link',
+        plugin: 'test_plugin_name',
+        displayName: 'Test Plugin Admin',
+        unauthorised: true,
+        order: 2,
+      },
+    ];
+
+    render(<Routing />, { wrapper: Wrapper });
+
+    window.dispatchEvent(
+      new CustomEvent('single-spa:before-no-app-change', {
+        detail: {
+          oldUrl: 'http://localhost/test_link',
+          newUrl: 'http://localhost/unauthorised_test_link',
+        },
+      })
+    );
+    expect(singleSpa.unloadApplication).toHaveBeenCalledWith(
+      'test_plugin_name'
+    );
+
+    (singleSpa.unloadApplication as jest.Mock).mockClear();
+
+    window.dispatchEvent(
+      new CustomEvent('single-spa:before-no-app-change', {
+        detail: {
+          oldUrl: 'http://localhost/unauthorised_test_link',
           newUrl: 'http://localhost/test_link',
         },
       })
@@ -280,13 +369,8 @@ describe('Routing component', () => {
 
     const clearIntervalSpy = jest.spyOn(window, 'clearInterval');
 
-    mount(
-      <Provider store={mockStore(state)}>
-        <MemoryRouter initialEntries={['/test_link']}>
-          <Routing />
-        </MemoryRouter>
-      </Provider>
-    );
+    render(<Routing />, { wrapper: Wrapper });
+
     jest.runAllTimers();
 
     expect(singleSpa.unloadApplication).toHaveBeenCalledWith(
@@ -294,5 +378,8 @@ describe('Routing component', () => {
     );
 
     expect(clearIntervalSpy).toHaveBeenCalledWith(expect.any(Number));
+
+    // restore clearInterval to avoid errors with it not being a function on unmount
+    clearIntervalSpy.mockRestore();
   });
 });
