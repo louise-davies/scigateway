@@ -13,10 +13,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@f1f314fca9dfce2769ece7d933488f076716723e # v1
         with:
           node-version: '14.x'
 
@@ -33,7 +33,7 @@ jobs:
         run: yarn version --new-version $VERSION --no-git-tag-version
 
       - name: 'Generate changelog'
-        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        uses: heinrichreimer/github-changelog-generator-action@6f5b9494dd265d6fb7243a10c53dc0169c55f247 # v2.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           base: CHANGELOG-BASE.md
@@ -42,7 +42,7 @@ jobs:
           sinceTag: v1.0.0
 
       - name: Commit changelog & package.json
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@3ea6ae190baf489ba007f7c92608f33ce20ef04a # v4
         with:
           commit_message: Update CHANGELOG and version for v${{ env.VERSION }}
           file_pattern: CHANGELOG.md package.json
